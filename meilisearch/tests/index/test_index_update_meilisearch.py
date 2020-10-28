@@ -7,50 +7,58 @@ class TestUpdate:
 
     """ TESTS: all update routes """
 
-    client = meilisearch.Client(BASE_URL, MASTER_KEY)
+    client = meilisearch.AsyncClient(BASE_URL, MASTER_KEY)
     index = None
     dataset_file = None
     dataset_json = None
 
-    def setup_class(self):
-        clear_all_indexes(self.client)
-        self.index = self.client.create_index(uid='indexUID')
+    @pytest.mark.asyncio
+    async def setup_class(self):
+        await clear_all_indexes(self.client)
+        self.index = await self.client.create_index(uid='indexUID')
         self.dataset_file = open('./datasets/small_movies.json', 'r')
         self.dataset_json = json.loads(self.dataset_file.read())
         self.dataset_file.close()
 
-    def teardown_class(self):
-        self.index.delete()
+    @pytest.mark.asyncio
+    async def teardown_class(self):
+        await self.index.delete()
+        await self.index.http.close()
+        await self.client.close()
 
-    def test_get_all_update_status_default(self):
+    @pytest.mark.asyncio
+    async def test_get_all_update_status_default(self):
         """Tests getting the updates list of an empty index"""
-        response = self.index.get_all_update_status()
+        response = await self.index.get_all_update_status()
         assert isinstance(response, list)
         assert response == []
 
-    def test_get_all_update_status(self):
+    @pytest.mark.asyncio
+    async def test_get_all_update_status(self):
         """Tests getting the updates list of a populated index"""
-        response = self.index.add_documents(self.dataset_json)
+        response = await self.index.add_documents(self.dataset_json)
         assert 'updateId' in response
-        response = self.index.add_documents(self.dataset_json)
+        response = await self.index.add_documents(self.dataset_json)
         assert 'updateId' in response
-        response = self.index.get_all_update_status()
+        response = await self.index.get_all_update_status()
         assert len(response) == 2
 
-    def test_get_update(self):
+    @pytest.mark.asyncio
+    async def test_get_update(self):
         """Tests getting an update of a given operation"""
-        response = self.index.add_documents(self.dataset_json)
+        response = await self.index.add_documents(self.dataset_json)
         assert 'updateId' in response
-        update = self.index.wait_for_pending_update(response['updateId'])
+        update = await self.index.wait_for_pending_update(response['updateId'])
         assert update['status'] == 'processed'
-        response = self.index.get_update_status(response['updateId'])
+        response = await self.index.get_update_status(response['updateId'])
         assert 'updateId' in response
         assert 'type' in response
         assert 'duration' in response
         assert 'enqueuedAt' in response
         assert 'processedAt' in response
 
-    def test_get_update_inexistent(self):
+    @pytest.mark.asyncio
+    async def test_get_update_inexistent(self):
         """Tests getting an update of an INEXISTENT operation"""
         with pytest.raises(Exception):
-            self.index.get_update_status('999')
+            await self.index.get_update_status('999')

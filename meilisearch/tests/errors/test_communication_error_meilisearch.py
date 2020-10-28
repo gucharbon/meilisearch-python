@@ -7,8 +7,9 @@ class TestMeiliSearchCommunicationError:
 
     """ TESTS: MeiliSearchCommunicationError class """
 
+    @pytest.mark.asyncio
     @staticmethod
-    def test_meilisearch_communication_error_host():
-        client = meilisearch.Client("http://wrongurl:1234", MASTER_KEY)
+    async def test_meilisearch_communication_error_host():
         with pytest.raises(MeiliSearchCommunicationError):
-            client.create_index("some_index")
+            async with meilisearch.AsyncClient("http://wrongurl:1234", MASTER_KEY) as client:
+                await client.create_index("some_index")

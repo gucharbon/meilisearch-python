@@ -1,3 +1,5 @@
+import pytest
+
 import meilisearch
 from meilisearch.tests import BASE_URL, MASTER_KEY, clear_all_indexes
 
@@ -5,22 +7,26 @@ class TestStats:
 
     """ TESTS: client stats route """
 
-    client = meilisearch.Client(BASE_URL, MASTER_KEY)
+    client = meilisearch.AsyncClient(BASE_URL, MASTER_KEY)
     index = None
     index2 = None
 
-    def setup_class(self):
-        clear_all_indexes(self.client)
-        self.index = self.client.create_index(uid='indexUID')
-        self.index_2 = self.client.create_index(uid='indexUID2')
+    @pytest.mark.asyncio
+    async def setup_class(self):
+        await clear_all_indexes(self.client)
+        self.index = await self.client.create_index(uid='indexUID')
+        self.index_2 = await self.client.create_index(uid='indexUID2')
 
-    def teardown_class(self):
-        self.index.delete()
-        self.index_2.delete()
+    @pytest.mark.asyncio
+    async def teardown_class(self):
+        await self.index.delete()
+        await self.index_2.delete()
+        await self.client.close()
 
-    def test_get_all_stats(self):
+    @pytest.mark.asyncio
+    async def test_get_all_stats(self):
         """Tests getting all stats after creating two indexes"""
-        response = self.client.get_all_stats()
+        response = await self.client.get_all_stats()
         assert isinstance(response, object)
         assert 'databaseSize' in response
         assert isinstance(response['databaseSize'], int)

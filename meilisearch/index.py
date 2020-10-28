@@ -31,7 +31,13 @@ class Index():
         self.uid = uid
         self.http = HttpRequests(config)
 
-    def delete(self):
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args, **kwargs):
+        await self.http.close()
+
+    async def delete(self):
         """Delete an index from meilisearch
 
         Returns
@@ -40,9 +46,9 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete('{}/{}'.format(self.config.paths.index, self.uid))
+        return await self.http.delete('{}/{}'.format(self.config.paths.index, self.uid))
 
-    def update(self, **body):
+    async def update(self, **body):
         """Update an index from meilisearch
 
         Parameters
@@ -60,9 +66,9 @@ class Index():
         primary_key = body.get('primaryKey', None)
         if primary_key is not None:
             payload['primaryKey'] = primary_key
-        return self.http.put('{}/{}'.format(self.config.paths.index, self.uid), payload)
+        return await self.http.put('{}/{}'.format(self.config.paths.index, self.uid), payload)
 
-    def info(self):
+    async def info(self):
         """Get info of index
 
         Returns
@@ -70,9 +76,9 @@ class Index():
         index: `dict`
             Dictionnary containing index information.
         """
-        return self.http.get('{}/{}'.format(self.config.paths.index, self.uid))
+        return await self.http.get('{}/{}'.format(self.config.paths.index, self.uid))
 
-    def get_primary_key(self):
+    async def get_primary_key(self):
         """Get the primary key
 
         Returns
@@ -80,10 +86,11 @@ class Index():
         primary_key: str
             String containing primary key.
         """
-        return self.info()['primaryKey']
+        info = await self.info()
+        return info['primaryKey']
 
     @staticmethod
-    def create(config, uid, options=None):
+    async def create(config, uid, options=None):
         """Create an index.
 
         Parameters
@@ -105,10 +112,11 @@ class Index():
         if options is None:
             options = {}
         payload = {**options, 'uid': uid}
-        return HttpRequests(config).post(config.paths.index, payload)
+        async with HttpRequests(config) as http_client:
+            return await http_client.post(config.paths.index, payload)
 
     @staticmethod
-    def get_indexes(config):
+    async def get_indexes(config):
         """Get all indexes from meilisearch.
 
         Returns
@@ -120,7 +128,8 @@ class Index():
         HTTPError
             In case of any error found here https://docs.meilisearch.com/references/#errors-status-code
         """
-        return HttpRequests(config).get(config.paths.index)
+        async with HttpRequests(config) as http_client:
+            return await http_client.get(config.paths.index)
 
     @staticmethod
     def get_index(config, uid):
@@ -141,7 +150,7 @@ class Index():
             return Index(config, uid=uid)
         raise Exception('Uid is needed to find index')
 
-    def get_all_update_status(self):
+    async def get_all_update_status(self):
         """Get all update status from MeiliSearch
 
         Returns
@@ -149,7 +158,7 @@ class Index():
         update: `list`
             List of all enqueued and processed actions of the index.
         """
-        return self.http.get(
+        return await self.http.get(
             '{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -157,7 +166,7 @@ class Index():
             )
         )
 
-    def get_update_status(self, update_id):
+    async def get_update_status(self, update_id):
         """Get one update from MeiliSearch
 
         Parameters
@@ -169,7 +178,7 @@ class Index():
         update: `list`
             List containing the details of the update status.
         """
-        return self.http.get(
+        return await self.http.get(
             '{}/{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -178,7 +187,7 @@ class Index():
             )
         )
 
-    def wait_for_pending_update(self, update_id, timeout_in_ms=5000, interval_in_ms=50):
+    async def wait_for_pending_update(self, update_id, timeout_in_ms=5000, interval_in_ms=50):
         """Wait until MeiliSearch processes an update, and get its status
 
         Parameters
@@ -197,7 +206,7 @@ class Index():
         start_time = datetime.now()
         elapsed_time = 0
         while elapsed_time < timeout_in_ms:
-            get_update = self.get_update_status(update_id)
+            get_update = await self.get_update_status(update_id)
             if get_update['status'] != 'enqueued':
                 return get_update
             sleep(interval_in_ms / 1000)
@@ -205,7 +214,7 @@ class Index():
             elapsed_time = time_delta.seconds * 1000 + time_delta.microseconds / 1000
         raise TimeoutError
 
-    def get_stats(self):
+    async def get_stats(self):
         """Get stats of an index
 
         Get information about the number of documents, field frequencies, ...
@@ -215,7 +224,7 @@ class Index():
         stats: `dict`
             Dictionnary containing stats about the given index.
         """
-        return self.http.get(
+        return await self.http.get(
             '{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -223,7 +232,7 @@ class Index():
             )
         )
 
-    def search(self, query, opt_params=None):
+    async def search(self, query, opt_params=None):
         """Search in meilisearch
 
         Parameters
@@ -244,7 +253,7 @@ class Index():
             'q': query,
             **opt_params
         }
-        return self.http.post(
+        return await self.http.post(
             '{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -252,7 +261,7 @@ class Index():
             body=body
         )
 
-    def get_document(self, document_id):
+    async def get_document(self, document_id):
         """Get one document with given document identifier
 
         Parameters
@@ -264,7 +273,7 @@ class Index():
         document: `dict`
             Dictionnary containing the documents information
         """
-        return self.http.get(
+        return await self.http.get(
             '{}/{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -273,7 +282,7 @@ class Index():
             )
         )
 
-    def get_documents(self, parameters=None):
+    async def get_documents(self, parameters=None):
         """Get a set of documents from the index
 
         Parameters
@@ -288,7 +297,7 @@ class Index():
         if parameters is None:
             parameters = {}
 
-        return self.http.get(
+        return await self.http.get(
             '{}/{}/{}?{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -296,7 +305,7 @@ class Index():
                 urllib.parse.urlencode(parameters))
             )
 
-    def add_documents(self, documents, primary_key=None):
+    async def add_documents(self, documents, primary_key=None):
         """Add documents to the index
 
         Parameters
@@ -324,9 +333,9 @@ class Index():
                 self.config.paths.document,
                 urllib.parse.urlencode({'primaryKey': primary_key})
             )
-        return self.http.post(url, documents)
+        return await self.http.post(url, documents)
 
-    def update_documents(self, documents, primary_key=None):
+    async def update_documents(self, documents, primary_key=None):
         """Update documents in the index
 
         Parameters
@@ -354,10 +363,10 @@ class Index():
                 self.config.paths.document,
                 urllib.parse.urlencode({'primaryKey': primary_key})
             )
-        return self.http.put(url, documents)
+        return await self.http.put(url, documents)
 
 
-    def delete_document(self, document_id):
+    async def delete_document(self, document_id):
         """Add documents to the index
 
         Parameters
@@ -370,7 +379,7 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             '{}/{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -379,7 +388,7 @@ class Index():
             )
         )
 
-    def delete_documents(self, ids):
+    async def delete_documents(self, ids):
         """Delete multiple documents of the index
 
         Parameters
@@ -392,7 +401,7 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             '{}/{}/{}/delete-batch'.format(
                 self.config.paths.index,
                 self.uid,
@@ -401,7 +410,7 @@ class Index():
             ids
         )
 
-    def delete_all_documents(self):
+    async def delete_all_documents(self):
         """Delete all documents of the index
 
         Returns
@@ -410,7 +419,7 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             '{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -421,7 +430,7 @@ class Index():
 
     # GENERAL SETTINGS ROUTES
 
-    def get_settings(self):
+    async def get_settings(self):
         """Get settings of an index
 
         https://docs.meilisearch.com/references/settings.html
@@ -431,7 +440,7 @@ class Index():
         settings: `dict`
             Dictionnary containing the settings of the index
         """
-        return self.http.get(
+        return await self.http.get(
             '{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -439,7 +448,7 @@ class Index():
             )
         )
 
-    def update_settings(self, body):
+    async def update_settings(self, body):
         """Update settings of an index
 
         https://docs.meilisearch.com/references/settings.html#update-settings
@@ -456,7 +465,7 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             '{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -465,7 +474,7 @@ class Index():
             body
         )
 
-    def reset_settings(self):
+    async def reset_settings(self):
         """Reset settings of an index to default values
 
         https://docs.meilisearch.com/references/settings.html#reset-settings
@@ -476,7 +485,7 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             '{}/{}/{}'.format(
                 self.config.paths.index,
                 self.uid,
@@ -486,7 +495,7 @@ class Index():
 
     # RANKING RULES SUB-ROUTES
 
-    def get_ranking_rules(self):
+    async def get_ranking_rules(self):
         """
         Get ranking rules of an index
 
@@ -495,11 +504,11 @@ class Index():
         settings: `list`
             List containing the ranking rules of the index
         """
-        return self.http.get(
+        return await self.http.get(
             self.__settings_url_for(self.config.paths.ranking_rules)
         )
 
-    def update_ranking_rules(self, body):
+    async def update_ranking_rules(self, body):
         """
         Update ranking rules of an index
 
@@ -514,12 +523,12 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             self.__settings_url_for(self.config.paths.ranking_rules),
             body
         )
 
-    def reset_ranking_rules(self):
+    async def reset_ranking_rules(self):
         """Reset ranking rules of an index to default values
 
         Returns
@@ -528,14 +537,14 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             self.__settings_url_for(self.config.paths.ranking_rules),
         )
 
 
     # DISTINCT ATTRIBUTE SUB-ROUTES
 
-    def get_distinct_attribute(self):
+    async def get_distinct_attribute(self):
         """
         Get distinct attribute of an index
 
@@ -544,11 +553,11 @@ class Index():
         settings: `str`
             String containing the distinct attribute of the index
         """
-        return self.http.get(
+        return await self.http.get(
             self.__settings_url_for(self.config.paths.distinct_attribute)
         )
 
-    def update_distinct_attribute(self, body):
+    async def update_distinct_attribute(self, body):
         """
         Update distinct attribute of an index
 
@@ -563,12 +572,12 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             self.__settings_url_for(self.config.paths.distinct_attribute),
             body
         )
 
-    def reset_distinct_attribute(self):
+    async def reset_distinct_attribute(self):
         """Reset distinct attribute of an index to default values
 
         Returns
@@ -577,13 +586,13 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             self.__settings_url_for(self.config.paths.distinct_attribute),
         )
 
     # SEARCHABLE ATTRIBUTES SUB-ROUTES
 
-    def get_searchable_attributes(self):
+    async def get_searchable_attributes(self):
         """
         Get searchable attributes of an index
 
@@ -592,11 +601,11 @@ class Index():
         settings: `list`
             List containing the searchable attributes of the index
         """
-        return self.http.get(
+        return await self.http.get(
             self.__settings_url_for(self.config.paths.searchable_attributes)
         )
 
-    def update_searchable_attributes(self, body):
+    async def update_searchable_attributes(self, body):
         """
         Update searchable attributes of an index
 
@@ -611,12 +620,12 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             self.__settings_url_for(self.config.paths.searchable_attributes),
             body
         )
 
-    def reset_searchable_attributes(self):
+    async def reset_searchable_attributes(self):
         """Reset searchable attributes of an index to default values
 
         Returns
@@ -625,13 +634,13 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             self.__settings_url_for(self.config.paths.searchable_attributes),
         )
 
     # DISPLAYED ATTRIBUTES SUB-ROUTES
 
-    def get_displayed_attributes(self):
+    async def get_displayed_attributes(self):
         """
         Get displayed attributes of an index
 
@@ -640,11 +649,11 @@ class Index():
         settings: `list`
             List containing the displayed attributes of the index
         """
-        return self.http.get(
+        return await self.http.get(
             self.__settings_url_for(self.config.paths.displayed_attributes)
         )
 
-    def update_displayed_attributes(self, body):
+    async def update_displayed_attributes(self, body):
         """
         Update displayed attributes of an index
 
@@ -659,12 +668,12 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             self.__settings_url_for(self.config.paths.displayed_attributes),
             body
         )
 
-    def reset_displayed_attributes(self):
+    async def reset_displayed_attributes(self):
         """Reset displayed attributes of an index to default values
 
         Returns
@@ -673,13 +682,13 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             self.__settings_url_for(self.config.paths.displayed_attributes),
         )
 
     # STOP WORDS SUB-ROUTES
 
-    def get_stop_words(self):
+    async def get_stop_words(self):
         """
         Get stop words of an index
 
@@ -688,11 +697,11 @@ class Index():
         settings: `list`
             List containing the stop words of the index
         """
-        return self.http.get(
+        return await self.http.get(
             self.__settings_url_for(self.config.paths.stop_words)
         )
 
-    def update_stop_words(self, body):
+    async def update_stop_words(self, body):
         """
         Update stop words of an index
 
@@ -707,12 +716,12 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             self.__settings_url_for(self.config.paths.stop_words),
             body
         )
 
-    def reset_stop_words(self):
+    async def reset_stop_words(self):
         """Reset stop words of an index to default values
 
         Returns
@@ -721,13 +730,13 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             self.__settings_url_for(self.config.paths.stop_words),
         )
 
     # SYNONYMS SUB-ROUTES
 
-    def get_synonyms(self):
+    async def get_synonyms(self):
         """
         Get synonyms of an index
 
@@ -736,11 +745,11 @@ class Index():
         settings: `dict`
             Dictionnary containing the synonyms of the index
         """
-        return self.http.get(
+        return await self.http.get(
             self.__settings_url_for(self.config.paths.synonyms)
         )
 
-    def update_synonyms(self, body):
+    async def update_synonyms(self, body):
         """
         Update synonyms of an index
 
@@ -755,12 +764,12 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             self.__settings_url_for(self.config.paths.synonyms),
             body
         )
 
-    def reset_synonyms(self):
+    async def reset_synonyms(self):
         """Reset synonyms of an index to default values
 
         Returns
@@ -769,13 +778,13 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             self.__settings_url_for(self.config.paths.synonyms),
         )
 
     # ATTRIBUTES FOR FACETING SUB-ROUTES
 
-    def get_attributes_for_faceting(self):
+    async def get_attributes_for_faceting(self):
         """
         Get attributes for faceting of an index
 
@@ -784,11 +793,11 @@ class Index():
         settings: `list`
             List containing the attributes for faceting of the index
         """
-        return self.http.get(
+        return await self.http.get(
             self.__settings_url_for(self.config.paths.attributes_for_faceting)
         )
 
-    def update_attributes_for_faceting(self, body):
+    async def update_attributes_for_faceting(self, body):
         """
         Update attributes for faceting of an index
 
@@ -803,12 +812,12 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.post(
+        return await self.http.post(
             self.__settings_url_for(self.config.paths.attributes_for_faceting),
             body
         )
 
-    def reset_attributes_for_faceting(self):
+    async def reset_attributes_for_faceting(self):
         """Reset attributes for faceting of an index to default values
 
         Returns
@@ -817,7 +826,7 @@ class Index():
             Dictionnary containing an update id to track the action:
             https://docs.meilisearch.com/references/updates.html#get-an-update-status
         """
-        return self.http.delete(
+        return await self.http.delete(
             self.__settings_url_for(self.config.paths.attributes_for_faceting),
         )
 

@@ -26,7 +26,16 @@ class Client():
         self.config = Config(url, apiKey)
         self.http = HttpRequests(self.config)
 
-    def create_index(self, uid, options=None):
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args, **kwargs):
+        await self.http.close()
+
+    async def close(self):
+        await self.http.close()
+
+    async def create_index(self, uid, options=None):
         """Create an index.
 
         If the argument `uid` isn't passed in, it will be generated
@@ -49,10 +58,10 @@ class Client():
             In case of any other error found here https://docs.meilisearch.com/references/#errors-status-code
         """
         index = Index(self.config, uid)
-        index.create(self.config, uid, options)
+        await index.create(self.config, uid, options)
         return index
 
-    def get_indexes(self):
+    async def get_indexes(self):
         """Get all indexes.
 
         Raises
@@ -64,7 +73,7 @@ class Client():
         list
             List of indexes in dictionnary format. (e.g [{ 'uid': 'movies' 'primaryKey': 'objectID' }])
         """
-        return Index.get_indexes(self.config)
+        return await Index.get_indexes(self.config)
 
 
     def get_index(self, uid):
@@ -81,7 +90,7 @@ class Client():
         """
         return Index.get_index(self.config, uid=uid)
 
-    def get_or_create_index(self, uid, options=None):
+    async def get_or_create_index(self, uid, options=None):
         """Get an index, or create it if it doesn't exist.
 
         Parameters
@@ -102,13 +111,13 @@ class Client():
         """
         index = self.get_index(uid)
         try:
-            index.create(self.config, uid, options)
+            await index.create(self.config, uid, options)
         except MeiliSearchApiError as err:
             if err.error_code != 'index_already_exists':
                 raise err
         return index
 
-    def get_all_stats(self):
+    async def get_all_stats(self):
         """Get all stats of MeiliSearch
 
         Get information about database size and all indexes
@@ -118,9 +127,9 @@ class Client():
         stats: `dict`
             Dictionnary containing stats about your MeiliSearch instance
         """
-        return self.http.get(self.config.paths.stat)
+        return await self.http.get(self.config.paths.stat)
 
-    def health(self):
+    async def health(self):
         """Get health of MeiliSearch
 
         `204` HTTP status response when MeiliSearch is healthy.
@@ -130,9 +139,9 @@ class Client():
         HTTPError
             If MeiliSearch is not healthy
         """
-        return self.http.get(self.config.paths.health)
+        return await self.http.get(self.config.paths.health)
 
-    def update_health(self, health):
+    async def update_health(self, health):
         """Update health of meilisearch
 
         Update health of MeiliSearch to true or false.
@@ -142,9 +151,9 @@ class Client():
         health: bool
             Boolean representing the health status of MeiliSearch. True for healthy.
         """
-        return self.http.put(self.config.paths.health, {'health': health})
+        return await self.http.put(self.config.paths.health, {'health': health})
 
-    def get_keys(self):
+    async def get_keys(self):
         """Get all keys created
 
         Get list of all the keys that were created and all their related information.
@@ -155,9 +164,9 @@ class Client():
             List of keys and their information.
             https://docs.meilisearch.com/references/keys.html#get-keys
         """
-        return self.http.get(self.config.paths.keys)
+        return await self.http.get(self.config.paths.keys)
 
-    def get_version(self):
+    async def get_version(self):
         """Get version MeiliSearch
 
         Returns
@@ -165,9 +174,9 @@ class Client():
         version: dict
             Information about the version of MeiliSearch.
         """
-        return self.http.get(self.config.paths.version)
+        return await self.http.get(self.config.paths.version)
 
-    def version(self):
+    async def version(self):
         """Alias for get_version
 
         Returns
@@ -175,9 +184,9 @@ class Client():
         version: dict
             Information about the version of MeiliSearch.
         """
-        return self.get_version()
+        return await self.get_version()
 
-    def create_dump(self):
+    async def create_dump(self):
         """Triggers the creation of a MeiliSearch dump
 
         Returns
@@ -186,9 +195,9 @@ class Client():
             Information about the dump.
             https://docs.meilisearch.com/references/dump.html#create-a-dump
         """
-        return self.http.post(self.config.paths.dumps)
+        return await self.http.post(self.config.paths.dumps)
 
-    def get_dump_status(self, uid):
+    async def get_dump_status(self, uid):
         """Retrieves the status of a MeiliSearch dump creation
 
         Parameters
@@ -202,6 +211,6 @@ class Client():
             Information about the dump status.
             https://docs.meilisearch.com/references/dump.html#get-dump-status
         """
-        return self.http.get(
+        return await self.http.get(
             self.config.paths.dumps + '/' + str(uid) + '/status'
         )

@@ -7,14 +7,16 @@ class TestMeiliSearchApiError:
 
     """ TESTS: MeiliSearchApiError class """
 
+    @pytest.mark.asyncio
     @staticmethod
-    def test_meilisearch_api_error_no_master_key():
-        client = meilisearch.Client(BASE_URL)
+    async def test_meilisearch_api_error_no_master_key():
         with pytest.raises(MeiliSearchApiError):
-            client.create_index("some_index")
+            async with meilisearch.AsyncClient(BASE_URL) as client:
+                await client.create_index("some_index")
 
+    @pytest.mark.asyncio
     @staticmethod
-    def test_meilisearch_api_error_wrong_master_key():
-        client = meilisearch.Client(BASE_URL, MASTER_KEY + '123')
+    async def test_meilisearch_api_error_wrong_master_key():
         with pytest.raises(MeiliSearchApiError):
-            client.create_index("some_index")
+            async with meilisearch.AsyncClient(BASE_URL, MASTER_KEY + '123') as client:
+                await client.create_index("some_index")

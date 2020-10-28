@@ -6,24 +6,27 @@ class TestClient:
 
     """ TESTS: Client class """
 
+    @pytest.mark.asyncio
     @staticmethod
-    def test_get_client():
+    async def test_get_client():
         """Tests getting a client instance"""
-        client = meilisearch.Client(BASE_URL, MASTER_KEY)
-        assert client.config
-        response = client.health()
-        assert response.status_code == 200
+        async with meilisearch.AsyncClient(BASE_URL, MASTER_KEY) as client:
+            assert client.config
+            response = await client.health()
+            assert response.status_code == 200
 
+    @pytest.mark.asyncio
     @staticmethod
-    def test_get_client_without_master_key():
+    async def test_get_client_without_master_key():
         """Tests getting a client instance without MASTER KEY"""
-        client = meilisearch.Client(BASE_URL)
         with pytest.raises(Exception):
-            client.get_version()
+            async with meilisearch.AsyncClient(BASE_URL) as client:
+                await client.get_version()
 
+    @pytest.mark.asyncio
     @staticmethod
-    def test_get_client_with_wrong_master_key():
+    async def test_get_client_with_wrong_master_key():
         """Tests getting a client instance with an invalid MASTER KEY"""
-        client = meilisearch.Client(BASE_URL, MASTER_KEY + "123")
         with pytest.raises(Exception):
-            client.get_version()
+            async with meilisearch.AsyncClient(BASE_URL, MASTER_KEY + "123") as client:
+                await client.get_version()

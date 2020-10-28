@@ -8,9 +8,10 @@ pylint = "*"
 pytest = "*"
 pdoc3 = "*"
 pytest-ordering = "*"
+pytest-asyncio = "*"
 
 [packages]
-requests = "*"
+httpx = "*"
 
 [requires]
-python_version = "3.7"
+python_version = ">3.7"
